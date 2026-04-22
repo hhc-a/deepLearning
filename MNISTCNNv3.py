@@ -242,3 +242,114 @@ plt.show()
 
 
 # TODO 3. 視覺化 Filters & Features
+# ============================================================
+# CNN 視覺化整合函式
+# ============================================================
+
+def visualize_cnn_filters(model):
+    """
+    視覺化第一層 Conv2D filters
+    """
+
+    first_conv_layer = None
+
+    for layer in model.layers:
+        if isinstance(layer, keras.layers.Conv2D):
+            first_conv_layer = layer
+            break
+
+    if first_conv_layer is None:
+        print("No Conv2D layer found.")
+        return
+
+    filters, biases = first_conv_layer.get_weights()
+
+    print("First Conv2D layer:", first_conv_layer.name)
+    print("Filter shape:", filters.shape)
+
+    f_min, f_max = filters.min(), filters.max()
+
+    if f_max - f_min != 0:
+        filters = (filters - f_min) / (f_max - f_min)
+
+    num_filters = min(32, filters.shape[-1])
+
+    fig, axes = plt.subplots(4, 8, figsize=(12, 6))
+    fig.suptitle("First Conv2D Layer Filters", fontsize=14)
+
+    for i, ax in enumerate(axes.flat):
+        if i < num_filters:
+            ax.imshow(filters[:, :, 0, i], cmap="gray")
+            ax.set_title(f"Filter {i}", fontsize=8)
+        ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_feature_maps(model, image, max_maps=32):
+    """
+    視覺化輸入圖片經過 CNN Conv2D layers 後的 feature maps
+    """
+
+    # 找出所有 Conv2D 層
+    conv_layers = [
+        layer for layer in model.layers
+        if isinstance(layer, keras.layers.Conv2D)
+    ]
+
+    if len(conv_layers) == 0:
+        print("No Conv2D layer found.")
+        return
+
+    # 建立中間層輸出模型
+    activation_model = keras.Model(
+        inputs=model.inputs,
+        outputs=[layer.output for layer in conv_layers]
+    )
+
+    # 加入 batch 維度
+    image_batch = np.expand_dims(image, axis=0)
+
+    # 取得每層 feature maps
+    activations = activation_model.predict(image_batch)
+
+    # 顯示原圖
+    plt.figure(figsize=(3, 3))
+    plt.imshow(image.squeeze(), cmap="gray")
+    plt.title("Input Image")
+    plt.axis("off")
+    plt.show()
+
+    # 顯示每一層 Conv2D feature maps
+    for layer, activation in zip(conv_layers, activations):
+        feature_maps = activation[0]
+
+        num_maps = min(max_maps, feature_maps.shape[-1])
+
+        cols = 8
+        rows = int(np.ceil(num_maps / cols))
+
+        plt.figure(figsize=(12, rows * 1.8))
+        plt.suptitle(f"Feature Maps - {layer.name}", fontsize=14)
+
+        for i in range(num_maps):
+            plt.subplot(rows, cols, i + 1)
+            plt.imshow(feature_maps[:, :, i], cmap="gray")
+            plt.title(f"Map {i}", fontsize=8)
+            plt.axis("off")
+
+        plt.tight_layout()
+        plt.show()
+
+
+# ============================================================
+# 執行 CNN 視覺化
+# ============================================================
+
+# 1. 視覺化第一層 filters
+visualize_cnn_filters(model)
+
+# 2. 視覺化某一張測試圖片的 feature maps
+img_index = 0
+visualize_feature_maps(model, test_images[img_index], max_maps=32)
